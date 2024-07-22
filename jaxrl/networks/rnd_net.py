@@ -38,9 +38,9 @@ def ste_step_fn(x):
 class RND_CNN(nn.Module):
     def setup(self):
         self.conv1 = nn.Conv(features=32, kernel_size=(3, 3), strides=(1, 1))
-        self.conv2 = nn.Conv(features=64, kernel_size=(3, 3), strides=(1, 1))
-        self.conv3 = nn.Conv(features=128, kernel_size=(3, 3), strides=(1, 1))
-        self.conv4 = nn.Conv(features=256, kernel_size=(3, 3), strides=(1, 1))
+        self.conv2 = nn.Conv(features=256, kernel_size=(3, 3), strides=(1, 1))
+        #self.conv3 = nn.Conv(features=128, kernel_size=(3, 3), strides=(1, 1))
+        #self.conv4 = nn.Conv(features=256, kernel_size=(3, 3), strides=(1, 1))
         self.mlp = nn.Dense(features=256)
 
     def __call__(self, x):
@@ -54,15 +54,17 @@ class RND_CNN(nn.Module):
         x = nn.relu(x)
         x = nn.max_pool(x, window_shape=(2, 2), strides=(2, 2))
         #print(f'conv2 x.shape is {x.shape}')
+        '''
         x = self.conv3(x)
         x = nn.relu(x)
         x = nn.max_pool(x, window_shape=(2, 2), strides=(2, 2))
-        #print(f'conv3 x.shape is {x.shape}')
+        print(f'conv3 x.shape is {x.shape}')
         
         x = self.conv4(x)
-        #x = nn.relu(x)
-        #print(f'conv4 x.shape is {x.shape}')
-        x = x.reshape((256,32))
+        x = nn.relu(x)
+        print(f'conv4 x.shape is {x.shape}')
+        '''
+        x = x.reshape((256,64))
         x = self.mlp(x)
         #print(f'mlp x.shape is {x.shape}')
         # Reshape to the desired output shape
@@ -85,25 +87,46 @@ class rnd_network(nn.Module):
             for hidn in self.hidden_dims]
         # CNN setup
         self.rnd_cnn = RND_CNN()
-        self.rnd_cnn_params = FrozenDict(self.rnd_cnn.init(self.cnn_key, jnp.ones((10, 256, 1024))).pop('params'))
-        
+        self.rnd_cnn_params = FrozenDict(self.rnd_cnn.init(self.cnn_key, jnp.ones((4, 256, 1024))).pop('params')) # was [10, 256, 1024]
+        # MLP setup
+        self.mlp1_hidden_dims = [256, 256, 256, 256]
+        self.mlp1 = [nn.Dense(hidn, kernel_init=default_init()) \
+            for hidn in self.mlp1_hidden_dims]
+        self.mlp2_hidden_dims = [128, 64]
+        self.mlp2 = [nn.Dense(hidn, kernel_init=default_init()) \
+            for hidn in self.mlp2_hidden_dims]
 
-    def __call__(self, x):
+    def __call__(self, 
+                 x: jnp.ndarray,
+                 t: jnp.ndarray):
         combined_list = []
-        for i in range(10):
-            j = jnp.array([i])
-            phi_l = ste_step_fn(self.embeds_bb[0](j))
+        for i, layer in enumerate(self.embeds_bb):
+            phi_l = ste_step_fn(self.embeds_bb[i](t))
             #print(f'the dimension of phi_l is {phi_l.shape}')
             mask_l = jnp.broadcast_to(phi_l, [x.shape[0], 1024])
             combined_list.append(mask_l)
         mask_t = jnp.stack(combined_list, axis=0)
         #print(f'the dimension of mask_t is {mask_t.shape}')
 
-        # CNN
+        # CNN for phi(task_embedding)
+        rnd_cnn_output = jnp.ones((256, 256))
         if mask_t.shape[1] == 256:   # batch size is 256
             rnd_cnn_output = self.rnd_cnn.apply({'params': self.rnd_cnn_params}, mask_t)
-            print(f'the dimension of mask_t is {rnd_cnn_output.shape}')
+            #print(f'the dimension of mask_t is {rnd_cnn_output.shape}')
 
+        # MLP for phi(st+1)
+        for i, layer in enumerate(self.mlp1):
+            x = layer(x)
+            if i < len(self.mlp1) - 1:
+                x = nn.relu(x)
+        phi_next_st = x  #
+        #print(f'phi_next_st.shape is {phi_next_st.shape}')
+        target_next_st = jnp.multiply(phi_next_st, rnd_cnn_output)
+        for i, layer in enumerate(self.mlp2):
+            target_next_st = layer(target_next_st)
+            if i < len(self.mlp1) - 1:
+                target_next_st = nn.relu(target_next_st)
+        
 
-        return mask_t
+        return target_next_st
 

@@ -17,7 +17,7 @@ import numpy as np
 from jaxrl.dict_learning.task_dict import OnlineDictLearnerV2
 
 
-recon_rate = 0
+rnd_rate = 0.01
 
 def _update_theta(
     rng: PRNGKey, task_id: int, param_mask: FrozenDict[str, Any], 
@@ -25,7 +25,7 @@ def _update_theta(
     batch: Batch, decoder: TrainState, rnd_net: TrainState) -> Tuple[PRNGKey, MPNTrainState, InfoDict]:
 
     rng, key = jax.random.split(rng)
-    def actor_decoder_loss_fn(actor_params: Params, decoder_params: Params) -> Tuple[jnp.ndarray, InfoDict]:
+    def actor_decoder_loss_fn(actor_params: Params, decoder_params: Params, rnd_net_params: Params) -> Tuple[jnp.ndarray, InfoDict]:
         dist, dicts = actor.apply_fn(
             {'params': actor_params}, batch.observations, jnp.array([task_id])
         )
@@ -36,12 +36,18 @@ def _update_theta(
         actor_loss = (log_probs * temp() - q).mean()
 
         phi_st = dicts['encoder_output']
+        #print(f'phi_st.shape is {phi_st.shape}')
+        #print(f'batch.actions.shape is {batch.actions.shape}')
         pre_input = jnp.concatenate([phi_st, batch.actions], -1)
-        pre_next_st = decoder.apply_fn({'params': decoder_params}, pre_input)
-        recon_loss = jnp.mean((pre_next_st - batch.next_observations)**2)
+        phi_next_st = decoder.apply_fn({'params': decoder_params}, pre_input)
+        #recon_loss = jnp.mean((pre_next_st - batch.next_observations)**2)
+
+        # rnd_net
+        target_next_st = rnd_net.apply_fn({'params': rnd_net_params}, batch.next_observations, jnp.array([task_id]))
+        rnd_loss = jnp.mean((phi_next_st - target_next_st)**2)
 
         _info = {
-            'recon_loss': recon_loss,
+            'rnd_loss': rnd_loss,
             'hac_sac_loss': actor_loss,
             'entropy': -log_probs.mean(),
             'means': dicts['means'].mean()
@@ -49,11 +55,11 @@ def _update_theta(
         for k in dicts['masks']:
             _info[k+'_rate_act'] = jnp.mean(dicts['masks'][k])
 
-        return actor_loss + recon_rate * recon_loss, _info
+        return actor_loss + rnd_rate * rnd_loss, _info
         
     # grads of actor
     # NOTE I need to deep understanding the jax.grad function
-    grads_actor_decoder, actor_info = jax.grad(actor_decoder_loss_fn, has_aux=True, argnums=[0, 1])(actor.params, decoder.params)
+    grads_actor_decoder, actor_info = jax.grad(actor_decoder_loss_fn, has_aux=True, argnums=[0, 1])(actor.params, decoder.params, rnd_net.params)
     grads_actor, grads_decoder = grads_actor_decoder
     # recording info
     g_norm = global_norm(grads_actor)
@@ -97,14 +103,15 @@ def _update_alpha(
         #print(f'phi_st.shape is {phi_st.shape}')
         #print(f'batch.actions.shape is {batch.actions.shape}')
         pre_input = jnp.concatenate([phi_st, batch.actions], -1)
-        pre_next_st = decoder.apply_fn({'params': decoder_params}, pre_input)
-        recon_loss = jnp.mean((pre_next_st - batch.next_observations)**2)
+        phi_next_st = decoder.apply_fn({'params': decoder_params}, pre_input)
+        #recon_loss = jnp.mean((pre_next_st - batch.next_observations)**2)
 
         # rnd_net
-        x = rnd_net.apply_fn({'params': rnd_net_params}, phi_st)
+        target_next_st = rnd_net.apply_fn({'params': rnd_net_params}, batch.next_observations, jnp.array([task_id]))
+        rnd_loss = jnp.mean((phi_next_st - target_next_st)**2)
 
         _info = {
-            'recon_loss': recon_loss,
+            'rnd_loss': rnd_loss,
             'hac_sac_loss': actor_loss,
             'entropy': -log_probs.mean(),
             'means': dicts['means'].mean()
@@ -112,7 +119,7 @@ def _update_alpha(
         for k in dicts['masks']:
             _info[k+'_rate_act'] = jnp.mean(dicts['masks'][k])
 
-        return actor_loss + recon_rate * recon_loss, _info
+        return actor_loss + rnd_rate * rnd_loss, _info
     
     # grads of actor
     print("updating alpha")
@@ -179,7 +186,7 @@ class RNDLearner(CoTASPLearner):
         self.decoder = decoder_network
 
         rnd_net_def = rnd_network()
-        rnd_net_params = FrozenDict(rnd_net_def.init(rnd_key, jnp.ones((1,1024))).pop('params'))
+        rnd_net_params = FrozenDict(rnd_net_def.init(rnd_key, jnp.ones((1,12)), jnp.array([0])).pop('params'))
         rnd_net_ = TrainState.create(
             apply_fn=rnd_net_def.apply,
             params=rnd_net_params,

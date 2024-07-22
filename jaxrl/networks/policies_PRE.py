@@ -16,7 +16,7 @@ class Decoder_PRE(nn.Module):
     Input the features
     Output the x. 
     """
-    features = [1028, 256, 64, 16, 12]
+    features = [1028, 256, 64]  #features = [1028, 256, 64, 16, 12]
 
     def setup(self):
         # where to add non-linearity function?
