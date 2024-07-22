@@ -13,7 +13,7 @@ def get_mt50() -> metaworld.MT50:
     saved_random_state = np.random.get_state()
     np.random.seed(999)
     random.seed(999)
-    MT50 = metaworld.MT50()
+    MT50 = metaworld.MT50V1()
     np.random.set_state(saved_random_state)
     return MT50
 

@@ -128,7 +128,7 @@ def _compute_fans(shape,
 
 def reset_model(main_cls, model_cls, configs: dict, inputs: list):
     model = model_cls(**configs)
-    _, new_params = model.init(*inputs).pop('params')
+    new_params = model.init(*inputs).pop('params')
     return main_cls.update_params(new_params)
 
 

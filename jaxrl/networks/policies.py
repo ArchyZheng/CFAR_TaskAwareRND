@@ -233,6 +233,7 @@ class MetaPolicy(nn.Module):
             x = layer(x)
             # straight-through estimator
             phi_l = ste_step_fn(self.embeds_bb[i](t))
+            #print(f'the dimension of phi_l is {phi_l.shape}')
             mask_l = jnp.broadcast_to(phi_l, x.shape)
             masks[layer.name] = mask_l
             # masking outputs
@@ -244,6 +245,22 @@ class MetaPolicy(nn.Module):
             else:
                 x = self.activation(x)
         
+        # TODO: created by Chengqi, the whole backbone as encoder for AE. This maybe can be improved.
+        encoder_output = x # created by Chengqi. help to compute the decoder
+        
+        # modification
+        '''
+        combined_list = []
+        for i in range(self.task_num):
+            j = jnp.array([i])
+            phi_l = ste_step_fn(self.embeds_bb[0](j))
+            print(f'the dimension of phi_l is {phi_l.shape}')
+            mask_l = jnp.broadcast_to(phi_l, x.shape)
+            combined_list.append(mask_l)
+        mask_t = jnp.stack(combined_list, axis=0)
+        print(print(f'the dimension of mask_t is {mask_t.shape}'))
+        '''
+
         means = self.mean_layer(x)
 
         # Avoid numerical issues by limiting the mean of the Gaussian
@@ -269,10 +286,12 @@ class MetaPolicy(nn.Module):
                                    reinterpreted_batch_ndims=1), {
                                     'masks': masks, 
                                     'means': means, 
-                                    'stddev': jax.nn.softplus(log_stds)
+                                    'stddev': jax.nn.softplus(log_stds),
+                                    'encoder_output': encoder_output,
+                                    #'mask_t': mask_t
                                    }
         else:
-            return base_dist, {'masks': masks, 'means': means, 'stddev': jax.nn.softplus(log_stds)}
+            return base_dist, {'masks': masks, 'means': means, 'stddev': jax.nn.softplus(log_stds), 'encoder_output': encoder_output}
 
     def get_grad_masks(self, masks: dict, input_dim: int = 12):
         grad_masks = {}

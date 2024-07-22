@@ -1,0 +1,36 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "run train cotasp",
+            "type": "shell",
+            "command": "/home/haiyan/anaconda3/envs/cotasp_chengqi/bin/python3",
+            "args": [
+                "train_cotasp.py"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "CUDA_VISIBLE_DEVICES": "0, 1",
+                    "WANDB_API_KEY": "d3be0188f8e6de441fe26438708884794c8db33f",
+                    "XLA_PYTHON_CLIENT_PREALLOCATE": "false",
+                }
+            },
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": false,
+            }
+        }
+    ],
+    "inputs":[
+        {
+            "id": "WANDB_API_KEY",
+            "type": "promptString",
+            "description": "Wandb API key",
+            "default": "d3be0188f8e6de441fe26438708884794c8db33f"
+        }
+    ]
+}

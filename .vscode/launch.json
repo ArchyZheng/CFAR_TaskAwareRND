@@ -1,0 +1,38 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "train cotasp",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "train_cotasp.py",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0, 1",
+                "WANDB_API_KEY": "d3be0188f8e6de441fe26438708884794c8db33f",
+                "XLA_PYTHON_CLIENT_PREALLOCATE": "false",
+            },
+            "console": "integratedTerminal"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "Algorithm name",
+            "type": "pickString",
+            "description": "algorihtm name",
+            "options": [
+                {
+                    "label": "original",
+                    "value": "cotasp"
+                },
+                {
+                    "label": "use AE",
+                    "value": "AE_Cotasp"
+                }
+            ]   
+        }
+    ]
+}
