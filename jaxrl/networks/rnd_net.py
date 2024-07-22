@@ -85,7 +85,7 @@ class rnd_network(nn.Module):
         self.task_num = 10
         # CNN setup
         self.rnd_cnn = RND_CNN()
-        self.rnd_cnn_params = FrozenDict(self.rnd_cnn.init(self.cnn_key, jnp.ones((4, 256, 1024))).pop('params')) # was [10, 256, 1024]
+        self.rnd_cnn_params = FrozenDict(self.rnd_cnn.init(self.cnn_key, jnp.ones((256, 4, 1024))).pop('params')) # was [10, 256, 1024]
         # MLP setup
         self.mlp1_hidden_dims = [256, 256, 256, 256]
         self.mlp1 = [nn.Dense(hidn, kernel_init=default_init()) \
@@ -96,21 +96,14 @@ class rnd_network(nn.Module):
 
     def __call__(self, 
                  x: jnp.ndarray,
-                 t: jnp.ndarray):
-        combined_list = []
-        for i, layer in enumerate(self.embeds_bb):
-            phi_l = ste_step_fn(self.embeds_bb[i](t))
-            #print(f'the dimension of phi_l is {phi_l.shape}')
-            mask_l = jnp.broadcast_to(phi_l, [x.shape[0], 1024])
-            combined_list.append(mask_l)
-        mask_t = jnp.stack(combined_list, axis=0)
+                #  t: jnp.ndarray,
+                 embedding):
         #print(f'the dimension of mask_t is {mask_t.shape}')
 
         # CNN for phi(task_embedding)
         rnd_cnn_output = jnp.ones((256, 256))
-        if mask_t.shape[1] == 256:   # batch size is 256
-            rnd_cnn_output = self.rnd_cnn.apply({'params': self.rnd_cnn_params}, mask_t)
-            #print(f'the dimension of mask_t is {rnd_cnn_output.shape}')
+        rnd_cnn_output = self.rnd_cnn.apply({'params': self.rnd_cnn_params}, embedding)
+        #print(f'the dimension of mask_t is {rnd_cnn_output.shape}')
 
         # MLP for phi(st+1)
         for i, layer in enumerate(self.mlp1):

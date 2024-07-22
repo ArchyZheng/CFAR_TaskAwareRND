@@ -18,6 +18,14 @@ from jaxrl.dict_learning.task_dict import OnlineDictLearnerV2
 
 
 rnd_rate = 0.01
+def embedding(actor, task_id):
+    output_list = []
+    embedding_name_list = ['embeds_bb_0', 'embeds_bb_1', 'embeds_bb_2', 'embeds_bb_3']
+    for embedding_name in embedding_name_list:
+        if embedding_name in actor.params.keys():
+            output_list.append(actor.params[embedding_name]['embedding'][task_id])
+    embed = jnp.stack(output_list)
+    return embed
 
 def _update_theta(
     rng: PRNGKey, task_id: int, param_mask: FrozenDict[str, Any], 
@@ -41,9 +49,10 @@ def _update_theta(
         pre_input = jnp.concatenate([phi_st, batch.actions], -1)
         phi_next_st = decoder.apply_fn({'params': decoder_params}, pre_input)
         #recon_loss = jnp.mean((pre_next_st - batch.next_observations)**2)
-
+        embedding_vector = embedding(actor, task_id)
+        embedding_vector = jnp.tile(embedding_vector, (batch.observations.shape[0], 1, 1))
         # rnd_net
-        target_next_st = rnd_net.apply_fn({'params': rnd_net_params}, batch.next_observations, jnp.array([task_id]))
+        target_next_st = rnd_net.apply_fn({'params': rnd_net_params}, batch.next_observations, embedding_vector)
         rnd_loss = jnp.mean((phi_next_st - target_next_st)**2)
 
         _info = {
@@ -105,9 +114,10 @@ def _update_alpha(
         pre_input = jnp.concatenate([phi_st, batch.actions], -1)
         phi_next_st = decoder.apply_fn({'params': decoder_params}, pre_input)
         #recon_loss = jnp.mean((pre_next_st - batch.next_observations)**2)
-
+        embedding_vector = embedding(actor, task_id)
+        embedding_vector = jnp.tile(embedding_vector, (batch.observations.shape[0], 1, 1))
         # rnd_net
-        target_next_st = rnd_net.apply_fn({'params': rnd_net_params}, batch.next_observations, jnp.array([task_id]))
+        target_next_st = rnd_net.apply_fn({'params': rnd_net_params}, batch.next_observations, embedding_vector)
         rnd_loss = jnp.mean((phi_next_st - target_next_st)**2)
 
         _info = {
@@ -186,7 +196,7 @@ class RNDLearner(CoTASPLearner):
         self.decoder = decoder_network
 
         rnd_net_def = rnd_network()
-        rnd_net_params = FrozenDict(rnd_net_def.init(rnd_key, jnp.ones((1,12)), jnp.array([0])).pop('params'))
+        rnd_net_params = FrozenDict(rnd_net_def.init(rnd_key, jnp.ones((1,12)), jnp.ones((256, 4, 1024))).pop('params'))
         rnd_net_ = TrainState.create(
             apply_fn=rnd_net_def.apply,
             params=rnd_net_params,

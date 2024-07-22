@@ -32,18 +32,18 @@ flags.DEFINE_integer('eval_interval', 20000, 'Eval interval.')
 flags.DEFINE_integer('batch_size', 256, 'Mini batch size.')
 flags.DEFINE_integer('updates_per_step', 1, 'Gradient updating per # environment steps.')
 flags.DEFINE_integer('buffer_size', int(1e6), 'Size of replay buffer')
-flags.DEFINE_integer('max_step', int(1e6), 'Number of training steps for each task') # 1e6
+flags.DEFINE_integer('max_step', int(1e4), 'Number of training steps for each task') # 1e6
 # flags.DEFINE_integer('max_step', int(1e3), 'Number of training steps for each task')
-flags.DEFINE_integer('start_training', int(1e4), 'Number of training steps to start training.') #1e4
+flags.DEFINE_integer('start_training', int(1e2), 'Number of training steps to start training.') #1e4
 # flags.DEFINE_integer('start_training', int(1e2), 'Number of training steps to start training.')
 flags.DEFINE_integer('theta_step', int(990), 'Number of training steps for theta.')
 flags.DEFINE_integer('alpha_step', int(10), 'Number of finetune steps for alpha.')
 
 flags.DEFINE_boolean('rnd_explore', True, 'random policy distillation')
-flags.DEFINE_integer('distill_steps', int(2e4), 'distillation steps') # 2e4
+flags.DEFINE_integer('distill_steps', int(2e2), 'distillation steps') # 2e4
 
 flags.DEFINE_boolean('tqdm', False, 'Use tqdm progress bar.')
-flags.DEFINE_string('wandb_mode', 'online', 'Track experiments with Weights and Biases.')
+flags.DEFINE_string('wandb_mode', 'offline', 'Track experiments with Weights and Biases.')
 flags.DEFINE_string('wandb_project_name', "CoTASP_RND", "The wandb's project name.")
 flags.DEFINE_string('wandb_entity', None, "the entity (team) of wandb's project")
 flags.DEFINE_boolean('save_checkpoint', False, 'Save meta-policy network parameters')
@@ -97,9 +97,8 @@ def main(_):
         TASK_SEQS[FLAGS.env_name][0]['task'], FLAGS.seed, 
         randomization=FLAGS.env_type)
     if algo == 'cotasp':
-        #ANCHOR - learner definition
-        agent = CoTASPLearner(
-        # agent = RNDLearner(
+        #agent = CoTASPLearner(
+        agent = RNDLearner(
             FLAGS.seed,
             temp_env.observation_space.sample()[np.newaxis],
             temp_env.action_space.sample()[np.newaxis], 
