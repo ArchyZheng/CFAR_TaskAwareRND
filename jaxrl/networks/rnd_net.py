@@ -83,8 +83,6 @@ class rnd_network(nn.Module):
         self.cnn_key = jax.random.PRNGKey(110)
         self.hidden_dims = [1024, 1024, 1024, 1024]
         self.task_num = 10
-        self.embeds_bb = [nn.Embed(self.task_num, hidn, embedding_init=default_init()) \
-            for hidn in self.hidden_dims]
         # CNN setup
         self.rnd_cnn = RND_CNN()
         self.rnd_cnn_params = FrozenDict(self.rnd_cnn.init(self.cnn_key, jnp.ones((4, 256, 1024))).pop('params')) # was [10, 256, 1024]

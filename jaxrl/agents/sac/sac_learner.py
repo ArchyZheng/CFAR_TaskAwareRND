@@ -257,11 +257,21 @@ def _update_alpha(
     for p, v in param_mask.items():
         if p[-1] == 'kernel':
             actor_info['used_capacity_'+p[0]] = 1.0 - jnp.mean(v)
+    
+    embedings = embeds(actor, task_id)
 
     # only update coefficients (alpha)
     new_actor = actor.apply_grads_alpha(grads=grads_actor)
 
     return rng, new_actor, actor_info
+
+def embeds(actor, task_id):
+    combined_list = []
+    layer_name_list = ['embeds_bb_0', 'embeds_bb_1', 'embeds_bb_2', 'embeds_bb_3']
+    for layer_name in layer_name_list:
+        combined_list.append(actor.params[layer_name]['embedding'][task_id])
+    embed_task = jnp.stack(combined_list, axis=0)
+    return embed_task
 
 def _update_theta(
     rng: PRNGKey, task_id: int, param_mask: FrozenDict[str, Any], 
@@ -488,6 +498,7 @@ class CoTASPLearner(SACLearner):
         get_grad_masks_jit = jax.jit(nn.apply(get_grad_masks, actor_def))
 
         # preset dict learner for each layer:
+        # NOTE - how to understand the meaning of dict4layers?
         self.dict4layers = {}
         for id_layer, hidn in enumerate(actor_configs['hidden_dims']):
             dict_learner = OnlineDictLearnerV2(
@@ -506,7 +517,7 @@ class CoTASPLearner(SACLearner):
         self.rng, _, dicts = _sample_actions(
             self.rng, actor, self.dummy_o, jnp.array([0])
         )
-        self.cumul_masks = tree_map(lambda x: jnp.zeros_like(x), dicts['masks'])
+        self.cumul_masks = tree_map(lambda x: jnp.zeros_like(x), dicts['masks']) #NOTE - is this very important?
         self.param_masks = freeze(
             get_grad_masks_jit({'params': actor.params}, self.cumul_masks)
         )

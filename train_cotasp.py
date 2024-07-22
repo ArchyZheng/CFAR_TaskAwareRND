@@ -97,8 +97,9 @@ def main(_):
         TASK_SEQS[FLAGS.env_name][0]['task'], FLAGS.seed, 
         randomization=FLAGS.env_type)
     if algo == 'cotasp':
-        #agent = CoTASPLearner(
-        agent = RNDLearner(
+        #ANCHOR - learner definition
+        agent = CoTASPLearner(
+        # agent = RNDLearner(
             FLAGS.seed,
             temp_env.observation_space.sample()[np.newaxis],
             temp_env.action_space.sample()[np.newaxis], 
