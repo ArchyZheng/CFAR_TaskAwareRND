@@ -32,9 +32,9 @@ flags.DEFINE_integer('eval_interval', 20000, 'Eval interval.')
 flags.DEFINE_integer('batch_size', 256, 'Mini batch size.')
 flags.DEFINE_integer('updates_per_step', 1, 'Gradient updating per # environment steps.')
 flags.DEFINE_integer('buffer_size', int(1e6), 'Size of replay buffer')
-flags.DEFINE_integer('max_step', int(1e4), 'Number of training steps for each task') # 1e6
+flags.DEFINE_integer('max_step', int(1e6), 'Number of training steps for each task') # 1e6
 # flags.DEFINE_integer('max_step', int(1e3), 'Number of training steps for each task')
-flags.DEFINE_integer('start_training', int(1e2), 'Number of training steps to start training.') #1e4
+flags.DEFINE_integer('start_training', int(1e4), 'Number of training steps to start training.') #1e4
 # flags.DEFINE_integer('start_training', int(1e2), 'Number of training steps to start training.')
 flags.DEFINE_integer('theta_step', int(990), 'Number of training steps for theta.')
 flags.DEFINE_integer('alpha_step', int(10), 'Number of finetune steps for alpha.')

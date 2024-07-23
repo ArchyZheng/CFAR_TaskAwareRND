@@ -12,11 +12,12 @@ from optax import global_norm
 import jaxrl.networks.common as utils_fn
 from typing import Any, Tuple
 import functools
-from jaxrl.agents.sac.sac_learner import _update_critic, _update_temp
+from jaxrl.agents.sac.sac_learner import _update_temp
+from jaxrl.agents.sac.critic import target_update
 import numpy as np
 from jaxrl.dict_learning.task_dict import OnlineDictLearnerV2
 from jax import custom_jvp
-from jax import vmap
+from jax import vmap, jit
 
 @custom_jvp
 def clip_fn(x):
@@ -42,6 +43,8 @@ def ste_step_fn(x):
     return zero + jax.lax.stop_gradient(jnp.heaviside(x, 0))
 
 rnd_rate = 0.01
+intric_rate = 0.001
+@jit
 def embedding(actor, task_id):
     output_list = []
     embedding_name_list = ['embeds_bb_0', 'embeds_bb_1', 'embeds_bb_2', 'embeds_bb_3']
@@ -50,8 +53,59 @@ def embedding(actor, task_id):
             output_list.append(actor.params[embedding_name]['embedding'][task_id])
     embed = jnp.stack(output_list)
     embed = vmap(ste_step_fn)(embed)
-    embed = jax.lax.expand_dims(embed, dimensions=(0, 1)) # add batch and channel
-    return embed
+    embed_mask = jax.lax.expand_dims(embed, dimensions=(0, 3)) # add batch and channel
+    return embed_mask
+def _update_critic(
+    rng: PRNGKey, task_id: int, actor: MPNTrainState, critic: TrainState, 
+    target_critic: TrainState, update_target: bool, temp: TrainState, batch: Batch, 
+    discount: float, tau: float, decoder: TrainState, rnd_net: TrainState) -> Tuple[PRNGKey, TrainState, TrainState, InfoDict]:
+    
+    rng, key = jax.random.split(rng)
+    dist, _ = actor(batch.next_observations, jnp.array([task_id]))
+    next_actions = dist.sample(seed=key)
+    next_log_probs = dist.log_prob(next_actions)
+    next_q1, next_q2 = target_critic(batch.next_observations, next_actions)
+    next_q = jnp.minimum(next_q1, next_q2)
+    next_q -= temp() * next_log_probs
+    # >>>>>>>>>>>>>>>> add intrisic reward >>>>>>>>>>>>>>>>>>>>>>>
+    reward = batch.rewards # task reward
+    _, dicts = actor.apply_fn({'params': actor.params}, batch.observations, jnp.array([task_id]))
+    encoder_output = dicts['encoder_output']
+    pre_input = jnp.concatenate([encoder_output, batch.actions], -1)
+    predict_z = decoder.apply_fn({'params': decoder.params}, pre_input)
+    tarfet_z = rnd_net.apply_fn({'params': rnd_net.params}, batch.next_observations, embedding(actor, task_id))
+    @vmap
+    def vector_norm(x): # L2 norm
+        return jnp.sqrt(jnp.sum(jnp.square(x)))
+    intrisic_reward = vector_norm(predict_z - tarfet_z)
+
+    reward = reward + intric_rate * intrisic_reward
+    # <<<<<<<<<<<<<<<< add intrisic reward <<<<<<<<<<<<<<<<<<<<<<<
+    target_q = reward + discount * batch.masks * next_q
+
+    
+
+    def critic_loss_fn(critic_params: Params) -> Tuple[jnp.ndarray, InfoDict]:
+        q1, q2 = critic.apply_fn({'params': critic_params}, batch.observations,
+                                 batch.actions)
+        critic_loss = ((q1 - target_q)**2 + (q2 - target_q)**2).mean()
+        return critic_loss, {
+            'critic_loss': critic_loss,
+            'q1': q1.mean(),
+            'q2': q2.mean()}
+    
+    grads_critic, critic_info = jax.grad(critic_loss_fn, has_aux=True)(critic.params)
+    # recording info
+    critic_info['g_norm_critic'] = global_norm(grads_critic)
+
+    new_critic = critic.apply_gradients(grads=grads_critic)
+    
+    if update_target:
+        new_target_critic = target_update(new_critic, target_critic, tau)
+    else:
+        new_target_critic = target_update(new_critic, target_critic, 0)
+
+    return rng, new_critic, new_target_critic, critic_info
 
 def _update_theta(
     rng: PRNGKey, task_id: int, param_mask: FrozenDict[str, Any], 
@@ -70,11 +124,8 @@ def _update_theta(
         actor_loss = (log_probs * temp() - q).mean()
 
         phi_st = dicts['encoder_output']
-        #print(f'phi_st.shape is {phi_st.shape}')
-        #print(f'batch.actions.shape is {batch.actions.shape}')
         pre_input = jnp.concatenate([phi_st, batch.actions], -1)
         phi_next_st = decoder.apply_fn({'params': decoder_params}, pre_input)
-        #recon_loss = jnp.mean((pre_next_st - batch.next_observations)**2)
         embedding_vector = embedding(actor, task_id)
         # rnd_net
         target_next_st = rnd_net.apply_fn({'params': rnd_net_params}, batch.next_observations, embedding_vector)
@@ -182,7 +233,7 @@ def _update_cotasp_jit(rng: PRNGKey, task_id: int, tau: float, discount: float,
     # optimizing critics 
     new_rng, new_critic, new_target_critic, critic_info = _update_critic(
         rng, task_id, actor, critic, target_critic, update_target, temp, 
-        batch, discount, tau
+        batch, discount, tau, decoder, rnd_net
     )
 
     # optimizing either alpha or theta
@@ -220,7 +271,7 @@ class RNDLearner(CoTASPLearner):
         self.decoder = decoder_network
 
         rnd_net_def = rnd_network()
-        rnd_net_params = FrozenDict(rnd_net_def.init(rnd_key, jnp.ones((1,12)), jnp.ones((1, 1, 4, 1024))).pop('params'))
+        rnd_net_params = FrozenDict(rnd_net_def.init(rnd_key, jnp.ones((1,12)), jnp.ones((1, 4, 1024, 1))).pop('params'))
         rnd_net_ = TrainState.create(
             apply_fn=rnd_net_def.apply,
             params=rnd_net_params,
