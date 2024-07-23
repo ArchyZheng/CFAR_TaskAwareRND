@@ -43,7 +43,7 @@ flags.DEFINE_boolean('rnd_explore', True, 'random policy distillation')
 flags.DEFINE_integer('distill_steps', int(2e2), 'distillation steps') # 2e4
 
 flags.DEFINE_boolean('tqdm', False, 'Use tqdm progress bar.')
-flags.DEFINE_string('wandb_mode', 'offline', 'Track experiments with Weights and Biases.')
+flags.DEFINE_string('wandb_mode', 'online', 'Track experiments with Weights and Biases.')
 flags.DEFINE_string('wandb_project_name', "CoTASP_RND", "The wandb's project name.")
 flags.DEFINE_string('wandb_entity', None, "the entity (team) of wandb's project")
 flags.DEFINE_boolean('save_checkpoint', False, 'Save meta-policy network parameters')

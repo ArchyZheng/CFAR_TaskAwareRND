@@ -15,7 +15,31 @@ import functools
 from jaxrl.agents.sac.sac_learner import _update_critic, _update_temp
 import numpy as np
 from jaxrl.dict_learning.task_dict import OnlineDictLearnerV2
+from jax import custom_jvp
+from jax import vmap
 
+@custom_jvp
+def clip_fn(x):
+    return jnp.minimum(jnp.maximum(x, 0), 1.0)
+
+@clip_fn.defjvp
+def f_jvp(primals, tangents):
+    # Custom derivative rule for clip_fn 
+    # x' = 1, when 0 < x < 1;
+    # x' = 0, otherwise.
+    x, = primals
+    x_dot, = tangents
+    ans = clip_fn(x)
+    ans_dot = jnp.where(x >= 1.0, 0, jnp.where(x <= 0, 0, 1.0)) * x_dot
+    return ans, ans_dot
+
+def ste_step_fn(x):
+    # Create an exactly-zero expression with Sterbenz lemma that has
+    # an exactly-one gradient.
+    # Straight-through estimator of step function
+    # its derivative is equal to 1 when 0 < x < 1, 0 otherwise.
+    zero = clip_fn(x) - jax.lax.stop_gradient(clip_fn(x))
+    return zero + jax.lax.stop_gradient(jnp.heaviside(x, 0))
 
 rnd_rate = 0.01
 def embedding(actor, task_id):
@@ -25,6 +49,8 @@ def embedding(actor, task_id):
         if embedding_name in actor.params.keys():
             output_list.append(actor.params[embedding_name]['embedding'][task_id])
     embed = jnp.stack(output_list)
+    embed = vmap(ste_step_fn)(embed)
+    embed = jax.lax.expand_dims(embed, dimensions=(0, 1)) # add batch and channel
     return embed
 
 def _update_theta(
@@ -50,7 +76,6 @@ def _update_theta(
         phi_next_st = decoder.apply_fn({'params': decoder_params}, pre_input)
         #recon_loss = jnp.mean((pre_next_st - batch.next_observations)**2)
         embedding_vector = embedding(actor, task_id)
-        embedding_vector = jnp.tile(embedding_vector, (batch.observations.shape[0], 1, 1))
         # rnd_net
         target_next_st = rnd_net.apply_fn({'params': rnd_net_params}, batch.next_observations, embedding_vector)
         rnd_loss = jnp.mean((phi_next_st - target_next_st)**2)
@@ -115,7 +140,6 @@ def _update_alpha(
         phi_next_st = decoder.apply_fn({'params': decoder_params}, pre_input)
         #recon_loss = jnp.mean((pre_next_st - batch.next_observations)**2)
         embedding_vector = embedding(actor, task_id)
-        embedding_vector = jnp.tile(embedding_vector, (batch.observations.shape[0], 1, 1))
         # rnd_net
         target_next_st = rnd_net.apply_fn({'params': rnd_net_params}, batch.next_observations, embedding_vector)
         rnd_loss = jnp.mean((phi_next_st - target_next_st)**2)
@@ -196,7 +220,7 @@ class RNDLearner(CoTASPLearner):
         self.decoder = decoder_network
 
         rnd_net_def = rnd_network()
-        rnd_net_params = FrozenDict(rnd_net_def.init(rnd_key, jnp.ones((1,12)), jnp.ones((256, 4, 1024))).pop('params'))
+        rnd_net_params = FrozenDict(rnd_net_def.init(rnd_key, jnp.ones((1,12)), jnp.ones((1, 1, 4, 1024))).pop('params'))
         rnd_net_ = TrainState.create(
             apply_fn=rnd_net_def.apply,
             params=rnd_net_params,
