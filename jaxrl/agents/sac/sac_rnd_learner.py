@@ -73,11 +73,11 @@ def _update_critic(
     encoder_output = dicts['encoder_output']
     pre_input = jnp.concatenate([encoder_output, batch.actions], -1)
     predict_z = decoder.apply_fn({'params': decoder.params}, pre_input)
-    tarfet_z = rnd_net.apply_fn({'params': rnd_net.params}, batch.next_observations, embedding(actor, task_id))
+    target_z = rnd_net.apply_fn({'params': rnd_net.params}, batch.next_observations, embedding(actor, task_id))
     @vmap
     def vector_norm(x): # L2 norm
         return jnp.sqrt(jnp.sum(jnp.square(x)))
-    intrisic_reward = vector_norm(predict_z - tarfet_z)
+    intrisic_reward = vector_norm(predict_z - target_z)
 
     reward = reward + intric_rate * intrisic_reward
     # <<<<<<<<<<<<<<<< add intrisic reward <<<<<<<<<<<<<<<<<<<<<<<
