@@ -11,9 +11,9 @@
             "program": "train_cotasp.py",
             "cwd": "${workspaceFolder}",
             "env": {
-                "CUDA_VISIBLE_DEVICES": "0, 1",
+                "CUDA_VISIBLE_DEVICES": "1",
                 "WANDB_API_KEY": "d3be0188f8e6de441fe26438708884794c8db33f",
-                "XLA_PYTHON_CLIENT_PREALLOCATE": "false",
+                "XLA_PYTHON_CLIENT_PREALLOCATE": "false"
             },
             "console": "integratedTerminal"
         }

@@ -14,13 +14,13 @@ from jaxrl.networks.common import InfoDict, TrainState, PRNGKey, Params, \
 
 class RND_CNN(nn.Module):
     def setup(self):
-        #TODO - kernel_init should written as np.sqrt(2)
+        #// TODO - kernel_init should written as np.sqrt(2)
         self.model = nn.Sequential([
-            nn.Conv(features=32, kernel_size=(8, 8), strides=(4, 4), name='conv1'),
+            nn.Conv(features=32, kernel_size=(8, 8), strides=(4, 4), name='conv1', kernel_init=default_init(jnp.sqrt(2))),
             activation_fn('relu'),
-            nn.Conv(features=64, kernel_size=(4, 4), strides=(2, 2), name='conv2'),
+            nn.Conv(features=64, kernel_size=(4, 4), strides=(2, 2), name='conv2', kernel_init=default_init(jnp.sqrt(2))),
             activation_fn('relu'),
-            nn.Conv(features=64, kernel_size=(4, 4), strides=(1, 1), name='conv3'),
+            nn.Conv(features=64, kernel_size=(4, 4), strides=(1, 1), name='conv3', kernel_init=default_init(jnp.sqrt(2))),
             activation_fn('relu')])
         self.mlp = nn.Sequential([
             nn.Dense(features=512, name='fc1'),

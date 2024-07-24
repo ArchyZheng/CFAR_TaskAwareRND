@@ -40,7 +40,7 @@ flags.DEFINE_integer('theta_step', int(990), 'Number of training steps for theta
 flags.DEFINE_integer('alpha_step', int(10), 'Number of finetune steps for alpha.')
 
 flags.DEFINE_boolean('rnd_explore', True, 'random policy distillation')
-flags.DEFINE_integer('distill_steps', int(2e2), 'distillation steps') # 2e4
+flags.DEFINE_integer('distill_steps', int(2e4), 'distillation steps') # 2e4
 
 flags.DEFINE_boolean('tqdm', False, 'Use tqdm progress bar.')
 flags.DEFINE_string('wandb_mode', 'online', 'Track experiments with Weights and Biases.')

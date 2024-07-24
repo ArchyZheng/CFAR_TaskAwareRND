@@ -43,9 +43,18 @@ def ste_step_fn(x):
     return zero + jax.lax.stop_gradient(jnp.heaviside(x, 0))
 
 rnd_rate = 0.01
-intric_rate = 0.001
+int_coeff = 1.
+ext_coeff = 2.
+
 @jit
 def embedding(actor, task_id):
+    """
+    this function will add two more dimensions to the embedding vector. batch and channel.
+    
+    @param actor: MPNTrainState
+    @param task_id: int
+    @return: ndarray -> (1, 4, 1024, 1) (N, H, W, C)
+    """
     output_list = []
     embedding_name_list = ['embeds_bb_0', 'embeds_bb_1', 'embeds_bb_2', 'embeds_bb_3']
     for embedding_name in embedding_name_list:
@@ -55,6 +64,7 @@ def embedding(actor, task_id):
     embed = vmap(ste_step_fn)(embed)
     embed_mask = jax.lax.expand_dims(embed, dimensions=(0, 3)) # add batch and channel
     return embed_mask
+
 def _update_critic(
     rng: PRNGKey, task_id: int, actor: MPNTrainState, critic: TrainState, 
     target_critic: TrainState, update_target: bool, temp: TrainState, batch: Batch, 
@@ -67,8 +77,9 @@ def _update_critic(
     next_q1, next_q2 = target_critic(batch.next_observations, next_actions)
     next_q = jnp.minimum(next_q1, next_q2)
     next_q -= temp() * next_log_probs
+
     # >>>>>>>>>>>>>>>> add intrisic reward >>>>>>>>>>>>>>>>>>>>>>>
-    reward = batch.rewards # task reward
+    ext_reward = batch.rewards # task reward
     _, dicts = actor.apply_fn({'params': actor.params}, batch.observations, jnp.array([task_id]))
     encoder_output = dicts['encoder_output']
     pre_input = jnp.concatenate([encoder_output, batch.actions], -1)
@@ -79,8 +90,9 @@ def _update_critic(
         return jnp.sqrt(jnp.sum(jnp.square(x)))
     intrisic_reward = vector_norm(predict_z - target_z)
 
-    reward = reward + intric_rate * intrisic_reward
+    reward = ext_coeff * ext_reward + int_coeff * intrisic_reward
     # <<<<<<<<<<<<<<<< add intrisic reward <<<<<<<<<<<<<<<<<<<<<<<
+
     target_q = reward + discount * batch.masks * next_q
 
     
@@ -99,6 +111,17 @@ def _update_critic(
     critic_info['g_norm_critic'] = global_norm(grads_critic)
 
     new_critic = critic.apply_gradients(grads=grads_critic)
+
+    # >>>>>>>>>>>>>>>>>>>>>> recording reward bonus info >>>>>>>>>>>>>>>>>>>>>>>>>>
+    critic_info['int_reward/mean'] = jnp.mean(intrisic_reward)
+    critic_info['int_reward/max'] = jnp.max(intrisic_reward)
+    critic_info['int_reward/min'] = jnp.min(intrisic_reward)
+    critic_info['int_reward/std'] = jnp.std(intrisic_reward)
+    critic_info['ext_reward/mean'] = jnp.mean(ext_reward)
+    critic_info['ext_reward/max'] = jnp.max(ext_reward)
+    critic_info['ext_reward/min'] = jnp.min(ext_reward)
+    critic_info['ext_reward/std'] = jnp.std(ext_reward)
+    # <<<<<<<<<<<<<<<<<<<<<< recording reward bonus info <<<<<<<<<<<<<<<<<<<<<<<<<<
     
     if update_target:
         new_target_critic = target_update(new_critic, target_critic, tau)
