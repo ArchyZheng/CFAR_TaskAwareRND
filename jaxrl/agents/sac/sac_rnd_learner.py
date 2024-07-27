@@ -147,6 +147,8 @@ def _update_theta(
         actor_loss = (log_probs * temp() - q).mean()
 
         phi_st = dicts['encoder_output']
+        #ANCHOR - stop gradient
+        phi_st = jax.lax.stop_gradient(phi_st)
         pre_input = jnp.concatenate([phi_st, batch.actions], -1)
         phi_next_st = decoder.apply_fn({'params': decoder_params}, pre_input)
         embedding_vector = embedding(actor, task_id)
@@ -208,6 +210,8 @@ def _update_alpha(
         actor_loss = (log_probs * temp() - q).mean()
 
         phi_st = dicts['encoder_output']
+        #ANCHOR - stop gradient
+        phi_st = jax.lax.stop_gradient(phi_st)
         #print(f'phi_st.shape is {phi_st.shape}')
         #print(f'batch.actions.shape is {batch.actions.shape}')
         pre_input = jnp.concatenate([phi_st, batch.actions], -1)
