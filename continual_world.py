@@ -13,22 +13,26 @@ def get_mt50() -> metaworld.MT50:
     saved_random_state = np.random.get_state()
     np.random.seed(999)
     random.seed(999)
-    MT50 = metaworld.MT50V1()
+    MT50 = metaworld.MT50()
     np.random.set_state(saved_random_state)
     return MT50
 
 TASK_SEQS = {
     "cw10": [
-        {'task': "hammer-v1", 'hint': 'Hammer a screw on the wall.'},
-        {'task': "push-wall-v1", 'hint': 'Bypass a wall and push a puck to a goal.'},
-        {'task': "faucet-close-v1", 'hint': 'Rotate the faucet clockwise.'},
-        {'task': "push-back-v1", 'hint': 'Pull a puck to a goal.'},
-        {'task': "stick-pull-v1", 'hint': 'Grasp a stick and pull a box with the stick.'},
-        {'task': "handle-press-side-v1", 'hint': 'Press a handle down sideways.'},
-        {'task': "push-v1", 'hint': 'Push the puck to a goal.'},
-        {'task': "shelf-place-v1", 'hint': 'Pick and place a puck onto a shelf.'},
-        {'task': "window-close-v1", 'hint': 'Push and close a window.'},
-        {'task': "peg-unplug-side-v1", 'hint': 'Unplug a peg sideways.'},
+        {'task': "hammer-v2", 'hint': 'Hammer a screw on the wall.'},
+        #{'task': "push-wall-v2", 'hint': 'Bypass a wall and push a puck to a goal.'},
+        #{'task': "basketball-v2", 'hint': 'Put the basketball into the net.'},
+        {'task': "door-open-v2", 'hint': 'Open the door.'},
+        {'task': "faucet-close-v2", 'hint': 'Rotate the faucet clockwise.'},
+        {'task': "push-back-v2", 'hint': 'Pull a puck to a goal.'},
+        #{'task': "stick-pull-v2", 'hint': 'Grasp a stick and pull a box with the stick.'},
+        {'task': "pick-out-of-hole-v2", 'hint': 'Pick a red ball out of a hole.'},
+        {'task': "handle-press-side-v2", 'hint': 'Press a handle down sideways.'},
+        #{'task': "push-v2", 'hint': 'Push the puck to a goal.'},
+        #{'task': "shelf-place-v2", 'hint': 'Pick and place a puck onto a shelf.'},
+        #{'task': "window-close-v2", 'hint': 'Push and close a window.'},
+        {'task': "coffee-pull-v2", 'hint': 'Pull the coffee cup out'},
+        {'task': "peg-unplug-side-v2", 'hint': 'Unplug a peg sideways.'},
     ],
     "cw1-hammer": [
         "hammer-v1"

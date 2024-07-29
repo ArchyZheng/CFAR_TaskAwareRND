@@ -293,7 +293,7 @@ class MetaPolicy(nn.Module):
         else:
             return base_dist, {'masks': masks, 'means': means, 'stddev': jax.nn.softplus(log_stds), 'encoder_output': encoder_output}
 
-    def get_grad_masks(self, masks: dict, input_dim: int = 12):
+    def get_grad_masks(self, masks: dict, input_dim: int = 39):
         grad_masks = {}
         for i, layer in enumerate(self.backbones):
             if i == 0:

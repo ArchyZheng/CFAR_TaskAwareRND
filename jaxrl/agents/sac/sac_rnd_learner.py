@@ -42,8 +42,8 @@ def ste_step_fn(x):
     zero = clip_fn(x) - jax.lax.stop_gradient(clip_fn(x))
     return zero + jax.lax.stop_gradient(jnp.heaviside(x, 0))
 
-rnd_rate = 0.01
-int_coeff = 1.
+rnd_rate = 0.001
+int_coeff = 0.01
 ext_coeff = 2.
 
 @jit
@@ -298,7 +298,7 @@ class RNDLearner(CoTASPLearner):
         self.decoder = decoder_network
 
         rnd_net_def = rnd_network()
-        rnd_net_params = FrozenDict(rnd_net_def.init(rnd_key, jnp.ones((1,12)), jnp.ones((1, 4, 1024, 1))).pop('params'))
+        rnd_net_params = FrozenDict(rnd_net_def.init(rnd_key, jnp.ones((1,39)), jnp.ones((1, 4, 1024, 1))).pop('params'))
         rnd_net_ = TrainState.create(
             apply_fn=rnd_net_def.apply,
             params=rnd_net_params,

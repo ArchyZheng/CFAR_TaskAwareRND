@@ -43,7 +43,7 @@ class rnd_network(nn.Module):
     Input the features
     Output the x. 
     """
-    features = [1024, 256, 64, 16, 12]
+    features = [1024, 256, 64, 39]
 
     def setup(self):
         self.cnn_key = jax.random.PRNGKey(110)
